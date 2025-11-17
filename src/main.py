@@ -6,6 +6,8 @@ from eval import Evaluate_Normal
 import torch
 import argparse
 
+import asyncio
+
 def gpu_clear():
     torch.cuda.empty_cache()
 
@@ -82,7 +84,7 @@ def main():
 
     evaluater = Evaluate_Normal(output_model, data)
     evaluater.generate_result(eval_num)
-    evaluater.eval_right()
+    asyncio.run(evaluater.eval_right())
 
 if __name__ == "__main__":
     main()

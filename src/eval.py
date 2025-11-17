@@ -8,6 +8,8 @@ import re
 
 from openai import OpenAI
 
+import asyncio
+
 class Evaluate_Normal():
     def __init__(self, model_path, dataset, dtype="bfloat16"):
         self.model_path=model_path
@@ -51,7 +53,7 @@ class Evaluate_Normal():
                 return_tensors="pt", 
                 padding=True, 
                 truncation=True,
-                max_length=256
+                max_length=1024
             )
             
             inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
@@ -65,24 +67,36 @@ class Evaluate_Normal():
                     temperature=0.7,
                     pad_token_id=self.tokenizer.pad_token_id
                 )
+            
             batch_outputs = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            batch_outputs = [out_text.replace(in_text, "") for out_text, in_text in zip(batch_outputs, batch_inputs)]
-            all_outputs.extend(batch_outputs)      
-        for out_text, item in zip(all_outputs, data):
-            '''print("***"*10)
-            print("input:", item["input"],"\n")
-            print("generated:", out_text)
-            print("label:", item["output"])'''
+            new_outputs = []
+            
+            for out_text, in_text in zip(batch_outputs, batch_inputs):
+                # Check if the generated output starts with the input and remove it
+                if out_text.startswith(in_text):
+                    new_out = out_text[len(in_text):].strip()  # Remove the input part from the start
+                else:
+                    new_out = out_text.strip()  # If input is not part of the start, keep the whole output
+                
+                new_outputs.append(new_out)   
+        for out_text, item in zip(new_outputs, data):
             item["generated_output"]=out_text
         self.result = data
 
-    def eval_right(self):
+    async def eval_right(self):
         correct = 0
         total = 0.0000001
+
+        tasks = []
+
         for item in self.result:
             label = item.get("output", "").strip()
             generated = item.get("generated_output", "").strip()
-            result = judge_the_correctness(label, generated)
+            tasks.append(judge_the_correctness(label, generated))
+            
+        results = await asyncio.gather(*tasks)
+
+        for result in results:
             if result == 1:
                 correct += 1
             total += 1
@@ -90,20 +104,18 @@ class Evaluate_Normal():
         print(f"Accuracy: {accuracy} ({correct}/{total})")
         return accuracy
 
-def judge_the_correctness(label, generated):
-    label = label.strip()
-    generated = generated.strip()
-    system_prompt = f"""You are an answer evaluator tasked with determining whether the provided answer is right or wrong.
-The label output: <<{label}>>
-The generated answer: <<{generated}>>
+async def judge_the_correctness(label, generated):
+    system_prompt = f"""You are an answer evaluator tasked with determining whether the provided answer from the assistant is right or wrong.
+The question and the generated answer: <<{generated}>>
+The right answer is: <<{label}>>
 -- Please only return "right" or "wrong", without any additional explanations.
 e.g. <judge>right</judge>
 """
     query = "Please judge the right or wrong and only return the answer."
     
-    client = OpenAI(api_key="your_api_key", base_url="base_url")
+    client = OpenAI(api_key="sk-05542169ff8644c08926a729949abff3", base_url="https://api.deepseek.com")
     response = client.chat.completions.create(
-    model="model-name",
+    model="deepseek-chat",
     messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": query},
