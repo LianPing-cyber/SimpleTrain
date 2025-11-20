@@ -94,7 +94,7 @@ class Trainer:
         trust_remote_code="true",
         lora_rank="16",
         template="empty",
-        cutoff_len="256",
+        cutoff_len="1024",
         overwrite_cache="true",
         preprocessing_num_workers="8",
         dataloader_num_workers="4",

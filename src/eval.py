@@ -25,12 +25,12 @@ class Evaluate_Normal():
         adapter_path = os.path.join(self.model_path,"adp")
         if os.path.exists(adapter_path):
             self.model = PeftModel.from_pretrained(
-                self.model_path, adapter_path
+                self.model, adapter_path
         )
         self.model.eval()
         
 
-    def generate_result(self, number=-1, batch_size=64):
+    def generate_result(self, number=-1, batch_size=32):
         if number == -1:
             data = self.dataset
         elif number >= len(self.dataset):
@@ -62,7 +62,7 @@ class Evaluate_Normal():
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=128,
+                    max_new_tokens=256,
                     do_sample=True,
                     temperature=0.7,
                     pad_token_id=self.tokenizer.pad_token_id
